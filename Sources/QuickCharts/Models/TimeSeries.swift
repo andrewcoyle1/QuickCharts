@@ -18,9 +18,12 @@ public nonisolated struct TimeSeries: Identifiable, Equatable, Sendable {
     /// The readings, in any order.
     public let data: [TimeSeriesDatapoint]
     
-    /// Cached sorted data
-    let sortedByDate: [TimeSeriesDatapoint]
-    let lastByDate: TimeSeriesDatapoint?
+    /// The readings sorted oldest first. Sorted once, when the series is made, so it's cheap to
+    /// read repeatedly, e.g. to binary-search a visible range.
+    public let sortedByDate: [TimeSeriesDatapoint]
+
+    /// The latest reading, or nil if there are none.
+    public let lastByDate: TimeSeriesDatapoint?
 
     /// Optional shaded range drawn behind the line. Empty means no band.
     public let band: [TimeSeriesBandDatapoint]

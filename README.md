@@ -26,6 +26,7 @@ Every part can be configured.
 - **Aggregation:** readings are averaged, totalled, spanned (lowest to highest) or left raw. The header can show the range's figure or the daily average, like Health's steps.
 - **Built for large histories:** only a few screens of data around the visible range are bucketed and plotted, and scrolling doesn't redraw the chart on every frame.
 - **Health-style screen:** `ChartScreen` puts the chart in an edge-to-edge top section whose colour carries on up behind the navigation bar, even when you pull down.
+- **Rows that highlight:** value rows under the chart mark their readings on it when tapped, and a "Show More" sheet keeps the chart pinned above more rows, like Health's detail screens.
 - **Live data:** pass new data in and the chart redraws, keeping its range and scroll position.
 - **Accessibility:** a VoiceOver audio graph and data table, and header figures read as sentences.
 - **Tested:** unit tests cover the aggregation, bucketing, calendar and wording logic, including daylight-saving weeks and 12- and 24-hour locales.
@@ -44,7 +45,7 @@ Add the package with Swift Package Manager.
 
   ```swift
   dependencies: [
-      .package(url: "https://github.com/andrewcoyle1/QuickCharts", from: "0.1.0"),
+      .package(url: "https://github.com/andrewcoyle1/QuickCharts", from: "0.2.0"),
   ],
   targets: [
       .target(name: "MyApp", dependencies: ["QuickCharts"]),
@@ -174,17 +175,43 @@ ChartScreen(title: "Steps") {
 }
 ```
 
-To put rows or buttons under the chart, on the chart's colour, pass `accessories`. `ChartValueRow` shows a label and a value in a capsule, and `ChartTextButton` is a plain button in the accent colour. Give a row a `ChartHighlight` and tapping it fills the row with the highlight's colour. The chart then greys out its own marks and marks the highlight's readings, given per series, each in its series' colour and with its value, like tapping "Latest" in Health. Tapping the row again, or tapping another row, clears it:
+### Rows under the chart
+
+Pass `accessories` to put rows or buttons under the chart, on the chart's colour.
+- **`ChartValueRow`:** a label and a value in a capsule.
+- **`ChartTextButton`:** a plain button in the accent colour.
+
+Give a row a `ChartHighlight` of readings, per series, and tapping the row shows them on the chart, like tapping "Latest" in Health:
+- **The row** fills with the highlight's colour.
+- **The chart** greys out its own marks and puts a dot on each reading, in its series' colour and labelled with its value. Each dot sits over its own series' bar or capsule.
+- **Scrolling:** if none of the readings are on screen, the chart scrolls to them. The highlight stays when the range changes.
+- **VoiceOver** announces the readings.
+
+Tapping the row again, or tapping another row, clears the highlight.
+
+Pass `moreRows` as well and a "Show More Heart Rate Data" button appears under the accessories. It opens a sheet with the chart pinned at the top, on the same range and scroll position, and the rows scrolling under it. Rows with highlights work there too. A range or scroll change made in the sheet carries back to the screen when the sheet closes.
+
+<p>
+  <img src="Docs/highlight.png" width="200" alt="A range chart greyed out, with the latest reading of each series marked by a labelled dot, and the selected Latest row filled blue">
+  <img src="Docs/show-more.png" width="200" alt="The Show More sheet: the chart pinned at the top, with rows for the latest, lowest and highest readings under it">
+</p>
 
 ```swift
 ChartScreen(title: "Heart Rate") {
-    RangeChart(data: heartRate, configuration: ChartConfiguration(unit: "BPM", seriesColors: [.pink]))
+    RangeChart(data: [heartRate], configuration: ChartConfiguration(unit: "BPM", seriesColors: [.pink]))
 } accessories: {
-    ChartValueRow("Latest: 12:50 p.m.", value: "38", unit: "BPM",
-                  highlight: ChartHighlight(points: ["Heart Rate": [latest]], color: .pink))
-    ChartTextButton("Show More Heart Rate Data") { showsMore = true }
+    latestRow
+} moreRows: {
+    latestRow
+    ChartValueRow("Resting Rate", value: "36", unit: "BPM",
+                  highlight: ChartHighlight(points: ["Heart Rate": resting], color: .pink))
 } sections: {
     …
+}
+
+var latestRow: some View {
+    ChartValueRow("Latest: 12:50 p.m.", value: "38", unit: "BPM",
+                  highlight: ChartHighlight(points: ["Heart Rate": [latest]], color: .pink))
 }
 ```
 
@@ -197,6 +224,7 @@ To build your own layout with the same top colour, mark the view whose top edge 
 - **Audio graph and data table:** each chart provides both to VoiceOver, named by `accessibilityTitle`.
 - **Header and callout:** each series in them is read as one sentence, for example "Resting, 62 BPM, from 55 to 71".
 - **Reduce Motion:** the selection callout honours it.
+- **Highlights:** a selected row reads as selected, and VoiceOver announces the readings it marks on the chart, for example "Resting, 36 BPM."
 
 ## Platform notes
 

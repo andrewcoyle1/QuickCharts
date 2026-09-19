@@ -80,14 +80,56 @@ final class ChartPresenter {
     /// Where each series' mark sits in a bucket, for charts that place the series side by side.
     var seriesSlots: SeriesSlots { SeriesSlots(series: data.map(\.name), bucket: bucket) }
 
-    /// The highlight's readings, each with its series' colour, for series the chart has.
+    /// The highlight's readings, each with its series' colour, for series the chart has. In each
+    /// bucket the highest keeps its label above, unless it's near the top of the chart, where the
+    /// label wouldn't fit; the rest put theirs below.
     var highlightPoints: [HighlightPoint] {
         guard let highlight else { return [] }
-        return data.enumerated().flatMap { index, series in
+        let points = data.enumerated().flatMap { index, series in
             (highlight.points[series.name] ?? []).map {
                 HighlightPoint(series: series.name, date: $0.date, value: $0.value, color: color(at: index))
             }
         }
+        let calendar = Calendar.current
+        let bucket = bucket
+        func bucketStart(_ point: HighlightPoint) -> Date {
+            calendar.dateInterval(of: bucket, for: point.date)?.start ?? point.date
+        }
+        // The first of the highest in each bucket, so a tie still gives one label above.
+        var highestIDs = Set<String>()
+        for group in Dictionary(grouping: points, by: bucketStart).values {
+            if let highest = group.max(by: { $0.value < $1.value }) { highestIDs.insert(highest.id) }
+        }
+        // Roughly a label's height, as a share of the plot.
+        let domain = yDomain
+        let roomAbove = domain.upperBound - (domain.upperBound - domain.lowerBound) / 8
+        return points.map { point in
+            var point = point
+            point.labelBelow = !highestIDs.contains(point.id) || point.value > roomAbove
+            return point
+        }
+    }
+
+    /// The highlight's readings as a sentence for VoiceOver, e.g. "Sample Set 1, 7 BPM. Sample Set
+    /// 2, 9 BPM." Nil with no highlight.
+    var highlightDescription: String? {
+        let points = highlightPoints
+        guard !points.isEmpty else { return nil }
+        let unit = configuration.unit.isEmpty ? "" : " \(configuration.unit)"
+        return points
+            .map { "\($0.series), \($0.value.formatted(configuration.valueFormat))\(unit)" }
+            .joined(separator: ". ") + "."
+    }
+
+    /// Scrolls to the period holding the highlight's newest reading, if none of its readings are on
+    /// screen, e.g. after scrolling back a few weeks and then tapping "Latest".
+    func revealHighlight() {
+        let dates = highlightPoints.map(\.date)
+        guard let newest = dates.max() else { return }
+        let start = interaction.scrollPosition
+        let visible = start..<start.addingTimeInterval(visibleLength)
+        guard !dates.contains(where: visible.contains) else { return }
+        interaction.scrollPosition = scale.currentPeriod(containing: newest).start
     }
 
     /// Each series' mark colour by name, for marks that style series individually (e.g. area

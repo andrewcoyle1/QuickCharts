@@ -48,3 +48,24 @@ extension EnvironmentValues {
     @Entry var chartHighlight: ChartHighlight?
     @Entry var chartHighlightSelection: ChartHighlightSelection?
 }
+
+extension View {
+    /// Keeps track of which `ChartValueRow` inside is selected, and hands its highlight to the
+    /// charts inside. Rows must reach it through plain views or scroll views: preferences don't
+    /// cross from one list row to another.
+    func chartHighlightScope() -> some View {
+        modifier(ChartHighlightScope())
+    }
+}
+
+private struct ChartHighlightScope: ViewModifier {
+    @State private var selectedID: UUID?
+    @State private var highlights: [UUID: ChartHighlight] = [:]
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.chartHighlight, selectedID.flatMap { highlights[$0] })
+            .environment(\.chartHighlightSelection, ChartHighlightSelection(id: selectedID) { selectedID = $0 })
+            .onPreferenceChange(ChartHighlightsKey.self) { highlights = $0 }
+    }
+}

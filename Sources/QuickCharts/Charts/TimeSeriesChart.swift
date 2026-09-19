@@ -19,6 +19,8 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
 
     /// Set by `ChartScreen` while one of its accessory rows is selected.
     @Environment(\.chartHighlight) private var highlight
+    /// Set by `ChartScreen` on its chart and the Show More sheet's copy, to keep the two in step.
+    @Environment(\.chartViewportLink) private var viewport
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -32,7 +34,37 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
             chart
         }
         .onChange(of: data) { presenter.update(data: data) }
-        .onChange(of: highlight, initial: true) { presenter.highlight = highlight }
+        .onChange(of: highlight, initial: true) {
+            presenter.highlight = highlight
+            presenter.revealHighlight()
+            if let description = presenter.highlightDescription {
+                AccessibilityNotification.Announcement(description).post()
+            }
+        }
+        .onAppear(perform: adoptViewport)
+        .onChange(of: viewport?.revision) { adoptViewport() }
+        .onChange(of: presenter.scale) {
+            // The highlight stays through a range change; make sure it's still in view.
+            presenter.revealHighlight()
+            // A scale change moves the scroll position without going through the chart's binding.
+            writeViewport()
+        }
+    }
+
+    /// Takes on the shared range and scroll position, or, as the first chart to appear, sets them.
+    private func adoptViewport() {
+        guard let viewport else { return }
+        guard let scale = viewport.scale, presenter.scales.contains(scale) else {
+            writeViewport()
+            return
+        }
+        if presenter.scale != scale { presenter.scale = scale } // resets the scroll position, so first
+        if let position = viewport.scrollPosition { presenter.scrollPosition = position }
+    }
+
+    private func writeViewport() {
+        viewport?.scale = presenter.scale
+        viewport?.scrollPosition = presenter.scrollPosition
     }
 
     private var timeScalePicker: some View {
@@ -54,6 +86,7 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
                 points: presenter.highlightPoints,
                 bucket: presenter.bucket,
                 slots: presenter.traits.placesSeriesSideBySide ? presenter.seriesSlots : nil,
+                unit: presenter.configuration.unit,
                 valueFormat: presenter.configuration.valueFormat
             )
         }
@@ -63,7 +96,12 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
         .chartYScale(domain: presenter.yDomain)
         .chartScrollableAxes(.horizontal)
         .chartXVisibleDomain(length: presenter.visibleLength)
-        .chartScrollPosition(x: $presenter.scrollPosition)
+        .chartScrollPosition(x: Binding {
+            presenter.scrollPosition
+        } set: {
+            presenter.scrollPosition = $0
+            viewport?.scrollPosition = $0
+        })
         // Settle on the nearest day/week/month; a flick carries on to the next period boundary.
         .chartScrollTargetBehavior(.valueAligned(
             matching: presenter.scale.scrollSnap,

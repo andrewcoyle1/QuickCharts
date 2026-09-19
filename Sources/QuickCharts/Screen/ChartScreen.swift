@@ -10,15 +10,25 @@ import SwiftUI
 /// A Health-style screen: `chart` in an edge-to-edge top section whose colour carries on up behind
 /// the nav bar, with any `accessories` under it on the same colour, then any further `sections`. Put
 /// it in a NavigationStack, and add toolbar items with `.toolbar { }` as on any view.
-public struct ChartScreen<Chart: View, Accessories: View, Sections: View>: View {
+///
+/// Given `moreRows`, a "Show More <title> Data" button under the accessories opens a sheet with the
+/// chart pinned at the top, on the same range and scroll position, and the rows scrolling under it.
+public struct ChartScreen<Chart: View, Accessories: View, MoreRows: View, Sections: View>: View {
     let title: String
     let chart: Chart
     let accessories: Accessories
+    let moreRows: MoreRows
+    /// Whether `moreRows` was given, so there's a sheet to offer.
+    let hasMoreRows: Bool
     let sections: Sections
 
+    /// The range and scroll position shared by the chart here and the sheet's copy of it.
+    @State private var viewport = ChartViewportLink()
+    @State private var showsMore = false
+
     /// A screen titled `title`, with `chart` at the top, `accessories` under it, e.g. a
-    /// `ChartValueRow` or a `ChartTextButton`, and then `sections`: list sections, e.g. a `Section`
-    /// of related values.
+    /// `ChartValueRow` or a `ChartTextButton`, then a button opening a sheet of `moreRows`, and then
+    /// `sections`: list sections, e.g. a `Section` of related values.
     ///
     /// The accessories share one list row with the chart, so give any other buttons among them
     /// `.buttonStyle(.borderless)`; otherwise a tap anywhere in the row triggers them all.
@@ -26,12 +36,19 @@ public struct ChartScreen<Chart: View, Accessories: View, Sections: View>: View 
         title: String,
         @ViewBuilder chart: () -> Chart,
         @ViewBuilder accessories: () -> Accessories,
+        @ViewBuilder moreRows: () -> MoreRows,
         @ViewBuilder sections: () -> Sections
     ) {
+        self.init(title: title, chart: chart(), accessories: accessories(), moreRows: moreRows(), hasMoreRows: true, sections: sections())
+    }
+
+    private init(title: String, chart: Chart, accessories: Accessories, moreRows: MoreRows, hasMoreRows: Bool, sections: Sections) {
         self.title = title
-        self.chart = chart()
-        self.accessories = accessories()
-        self.sections = sections()
+        self.chart = chart
+        self.accessories = accessories
+        self.moreRows = moreRows
+        self.hasMoreRows = hasMoreRows
+        self.sections = sections
     }
 
     public var body: some View {
@@ -63,50 +80,112 @@ public struct ChartScreen<Chart: View, Accessories: View, Sections: View>: View 
         .topFill(Color(.secondarySystemGroupedBackground))
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        // The chart here stayed on screen under the sheet, so it takes on any range or scroll
+        // change made there.
+        .sheet(isPresented: $showsMore, onDismiss: viewport.pushToCharts) {
+            ChartMoreSheet(title: title, chart: chart, rows: moreRows)
+                .environment(\.chartViewportLink, viewport)
+        }
     }
 
     private var chartBlock: some View {
-        ChartBlock(chart: chart, accessories: accessories)
-            .topFillEdge()
-    }
-}
-
-/// The chart with its accessories under it. Holds which row is selected, and hands that row's
-/// highlight to the chart. Kept inside the list row so the rows' preferences reach it: they don't
-/// cross from one list row to another.
-private struct ChartBlock<Chart: View, Accessories: View>: View {
-    let chart: Chart
-    let accessories: Accessories
-
-    @State private var selectedID: UUID?
-    @State private var highlights: [UUID: ChartHighlight] = [:]
-
-    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             chart
-                .environment(\.chartHighlight, selectedID.flatMap { highlights[$0] })
+                .environment(\.chartViewportLink, viewport)
             accessories
+            if hasMoreRows {
+                ChartTextButton("Show More \(title) Data") { showsMore = true }
+            }
         }
-        .environment(\.chartHighlightSelection, ChartHighlightSelection(id: selectedID) { selectedID = $0 })
-        .onPreferenceChange(ChartHighlightsKey.self) { highlights = $0 }
+        .chartHighlightScope()
+        .topFillEdge()
     }
 }
 
-extension ChartScreen where Accessories == EmptyView {
+/// The "Show More" sheet: the chart pinned at the top, with the rows scrolling under it. Tapping a
+/// row highlights it on this chart, as on the screen.
+private struct ChartMoreSheet<Chart: View, Rows: View>: View {
+    let title: String
+    let chart: Chart
+    let rows: Rows
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                chart
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                // A scroll view, not a list: the rows' highlights reach the scope through it.
+                ScrollView {
+                    VStack(spacing: 8) {
+                        rows
+                    }
+                    .padding(16)
+                }
+                // Rows fade out as they scroll up under the chart, rather than being cut off. At
+                // rest the first row sits below the fade.
+                .mask {
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 16)
+                        Color.black
+                    }
+                }
+            }
+            .chartHighlightScope()
+            .background(Color(.secondarySystemGroupedBackground))
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close", systemImage: "xmark") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+extension ChartScreen where MoreRows == EmptyView {
+    /// A screen with the chart, `accessories` under it, and then `sections`.
+    public init(
+        title: String,
+        @ViewBuilder chart: () -> Chart,
+        @ViewBuilder accessories: () -> Accessories,
+        @ViewBuilder sections: () -> Sections
+    ) {
+        self.init(title: title, chart: chart(), accessories: accessories(), moreRows: EmptyView(), hasMoreRows: false, sections: sections())
+    }
+}
+
+extension ChartScreen where Sections == EmptyView {
+    /// A screen with the chart, `accessories` under it, and a button opening a sheet of `moreRows`.
+    public init(
+        title: String,
+        @ViewBuilder chart: () -> Chart,
+        @ViewBuilder accessories: () -> Accessories,
+        @ViewBuilder moreRows: () -> MoreRows
+    ) {
+        self.init(title: title, chart: chart, accessories: accessories, moreRows: moreRows, sections: { EmptyView() })
+    }
+}
+
+extension ChartScreen where Accessories == EmptyView, MoreRows == EmptyView {
     /// A screen with the chart and then `sections`.
     public init(title: String, @ViewBuilder chart: () -> Chart, @ViewBuilder sections: () -> Sections) {
         self.init(title: title, chart: chart, accessories: { EmptyView() }, sections: sections)
     }
 }
 
-extension ChartScreen where Sections == EmptyView {
+extension ChartScreen where MoreRows == EmptyView, Sections == EmptyView {
     /// A screen with the chart and `accessories` under it.
     public init(title: String, @ViewBuilder chart: () -> Chart, @ViewBuilder accessories: () -> Accessories) {
         self.init(title: title, chart: chart, accessories: accessories, sections: { EmptyView() })
     }
 }
 
-extension ChartScreen where Accessories == EmptyView, Sections == EmptyView {
+extension ChartScreen where Accessories == EmptyView, MoreRows == EmptyView, Sections == EmptyView {
     /// A screen with just the chart.
     public init(title: String, @ViewBuilder chart: () -> Chart) {
         self.init(title: title, chart: chart, accessories: { EmptyView() }, sections: { EmptyView() })

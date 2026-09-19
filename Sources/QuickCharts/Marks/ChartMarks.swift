@@ -237,6 +237,7 @@ struct HighlightPoints: ChartContent {
     let bucket: Calendar.Component
     /// The chart's side-by-side slots, if it has them, so each dot sits on its own series' mark.
     let slots: SeriesSlots?
+    let unit: String
     let valueFormat: FloatingPointFormatStyle<Double>
 
     var body: some ChartContent {
@@ -249,12 +250,19 @@ struct HighlightPoints: ChartContent {
             // An explicit colour, so it's outside the series scale that greys everything else.
             .foregroundStyle(point.color)
             .symbolSize(60)
-            .annotation(position: .top, spacing: 4) {
+            // Kept inside the chart, so a reading near the top or bottom isn't cut off.
+            .annotation(
+                position: point.labelBelow ? .bottom : .top,
+                spacing: 4,
+                overflowResolution: AnnotationOverflowResolution(x: .fit(to: .chart), y: .fit(to: .chart))
+            ) {
                 Text(point.value, format: valueFormat)
                     .font(.subheadline)
                     .fontWeight(.bold)
                     .foregroundStyle(point.color)
             }
+            .accessibilityLabel(point.series)
+            .accessibilityValue(unit.isEmpty ? point.value.formatted(valueFormat) : "\(point.value.formatted(valueFormat)) \(unit)")
         }
     }
 

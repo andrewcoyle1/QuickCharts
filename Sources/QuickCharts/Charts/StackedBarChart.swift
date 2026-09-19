@@ -26,7 +26,7 @@ public struct StackedBarChart: View {
             if let selection = presenter.selection {
                 SelectionStick(date: selection.date, bucket: presenter.bucket)
             }
-            SeriesBars(points: presenter.linePoints, bucket: presenter.bucket, stacked: true)
+            SeriesBars(points: presenter.linePoints, bucket: presenter.bucket) // no slots, so they stack
         }
     }
 }

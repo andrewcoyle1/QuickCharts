@@ -129,41 +129,60 @@ struct SeriesAreas: ChartContent {
 /// reading.
 struct SeriesRanges: ChartContent {
     let points: [PlotBandPoint]
-    let bucket: Calendar.Component
+    let slots: SeriesSlots
 
     var body: some ChartContent {
         ForEach(points) { point in
-            BarMark(
-                x: .value("Day", point.date, unit: bucket),
-                yStart: .value("Lower", point.lower),
-                yEnd: .value("Upper", point.upper)
-            )
-            .foregroundStyle(by: .value("Series", point.series))
-            .position(by: .value("Series", point.series))
-            .clipShape(Capsule())
+            capsule(for: point)
+        }
+    }
+
+    private func capsule(for point: PlotBandPoint) -> some ChartContent {
+        let span = slots.span(of: point.series, at: point.date)
+        // A rectangle, since a bar can't take both a start and an end on x and on y.
+        return RectangleMark(
+            xStart: .value("Start", span.lowerBound),
+            xEnd: .value("End", span.upperBound),
+            yStart: .value("Lower", point.lower),
+            yEnd: .value("Upper", point.upper)
+        )
+        .foregroundStyle(by: .value("Series", point.series))
+        .clipShape(Capsule())
+    }
+}
+
+/// Each series as a bar per bucket, side by side in `slots`, or stacked on each other when there
+/// are none.
+struct SeriesBars: ChartContent {
+    let points: [PlotPoint]
+    let bucket: Calendar.Component
+    var slots: SeriesSlots?
+
+    var body: some ChartContent {
+        ForEach(points) { point in
+            if let slots {
+                bar(for: point, in: slots)
+            } else {
+                // Bars at the same x stack by default.
+                BarMark(
+                    x: .value("Day", point.date, unit: bucket),
+                    y: .value("Value", point.value)
+                )
+                .foregroundStyle(by: .value("Series", point.series))
+            }
         }
     }
 }
 
-/// Each series as a bar per bucket, side by side or stacked on each other.
-struct SeriesBars: ChartContent {
-    let points: [PlotPoint]
-    let bucket: Calendar.Component
-    var stacked = false
-
-    var body: some ChartContent {
-        ForEach(points) { point in
-            let bar = BarMark(
-                x: .value("Day", point.date, unit: bucket),
-                y: .value("Value", point.value)
-            )
-            .foregroundStyle(by: .value("Series", point.series))
-            if stacked {
-                bar // bars at the same x stack by default
-            } else {
-                bar.position(by: .value("Series", point.series))
-            }
-        }
+extension SeriesBars {
+    private func bar(for point: PlotPoint, in slots: SeriesSlots) -> some ChartContent {
+        let span = slots.span(of: point.series, at: point.date)
+        return BarMark(
+            xStart: .value("Start", span.lowerBound),
+            xEnd: .value("End", span.upperBound),
+            y: .value("Value", point.value)
+        )
+        .foregroundStyle(by: .value("Series", point.series))
     }
 }
 
@@ -208,5 +227,40 @@ struct SelectionLollipop: ChartContent {
             .foregroundStyle(by: .value("Series", row.series.name))
             .symbolSize(120)
         }
+    }
+}
+
+/// A selected accessory row's readings: a dot on each in its series' colour, labelled with its value.
+/// Drawn last, over the greyed-out series.
+struct HighlightPoints: ChartContent {
+    let points: [HighlightPoint]
+    let bucket: Calendar.Component
+    /// The chart's side-by-side slots, if it has them, so each dot sits on its own series' mark.
+    let slots: SeriesSlots?
+    let valueFormat: FloatingPointFormatStyle<Double>
+
+    var body: some ChartContent {
+        ForEach(points) { point in
+            // Over its series' mark, not at the reading's exact time.
+            PointMark(
+                x: .value("Day", slots?.center(of: point.series, at: point.date) ?? bucketMiddle(of: point.date)),
+                y: .value("Value", point.value)
+            )
+            // An explicit colour, so it's outside the series scale that greys everything else.
+            .foregroundStyle(point.color)
+            .symbolSize(60)
+            .annotation(position: .top, spacing: 4) {
+                Text(point.value, format: valueFormat)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(point.color)
+            }
+        }
+    }
+
+    /// Where the marks without slots centre a bucket's point.
+    private func bucketMiddle(of date: Date) -> Date {
+        guard let interval = Calendar.current.dateInterval(of: bucket, for: date) else { return date }
+        return interval.start.addingTimeInterval(interval.duration / 2)
     }
 }

@@ -19,7 +19,7 @@ public struct RangeChart: View {
         var configuration = configuration
         configuration.aggregation = .range // the capsules are each bucket's lowest to highest reading
         self.data = data
-        _presenter = State(initialValue: ChartPresenter(data: data, configuration: configuration, traits: ChartPresenter.Traits(showsBand: true, isContinuous: false)))
+        _presenter = State(initialValue: ChartPresenter(data: data, configuration: configuration, traits: ChartPresenter.Traits(showsBand: true, isContinuous: false, placesSeriesSideBySide: true)))
     }
 
     public var body: some View {
@@ -27,7 +27,7 @@ public struct RangeChart: View {
             if let selection = presenter.selection {
                 SelectionStick(date: selection.date, bucket: presenter.bucket)
             }
-            SeriesRanges(points: presenter.bandPoints, bucket: presenter.bucket)
+            SeriesRanges(points: presenter.bandPoints, slots: presenter.seriesSlots)
         }
     }
 }

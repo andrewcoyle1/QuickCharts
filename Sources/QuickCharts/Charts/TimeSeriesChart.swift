@@ -17,6 +17,9 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
     let data: [TimeSeries]
     @ChartContentBuilder let marks: () -> Marks
 
+    /// Set by `ChartScreen` while one of its accessory rows is selected.
+    @Environment(\.chartHighlight) private var highlight
+
     var body: some View {
         VStack(alignment: .leading) {
             // Nothing to pick between with a single range.
@@ -29,6 +32,7 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
             chart
         }
         .onChange(of: data) { presenter.update(data: data) }
+        .onChange(of: highlight, initial: true) { presenter.highlight = highlight }
     }
 
     private var timeScalePicker: some View {
@@ -46,8 +50,14 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
             if let goal = presenter.configuration.goal {
                 GoalLine(value: goal)
             }
+            HighlightPoints(
+                points: presenter.highlightPoints,
+                bucket: presenter.bucket,
+                slots: presenter.traits.placesSeriesSideBySide ? presenter.seriesSlots : nil,
+                valueFormat: presenter.configuration.valueFormat
+            )
         }
-        .chartForegroundStyleScale(domain: presenter.data.map(\.name), range: presenter.seriesColors)
+        .chartForegroundStyleScale(domain: presenter.data.map(\.name), range: presenter.markColors)
         .chartLegend(.hidden) // the header and callout name the series
         .chartXScale(domain: presenter.fullDomain)
         .chartYScale(domain: presenter.yDomain)

@@ -8,18 +8,29 @@
 import SwiftUI
 
 /// A Health-style screen: `chart` in an edge-to-edge top section whose colour carries on up behind
-/// the nav bar, then any further `sections`. Put it in a NavigationStack, and add toolbar items with
-/// `.toolbar { }` as on any view.
-public struct ChartScreen<Chart: View, Sections: View>: View {
+/// the nav bar, with any `accessories` under it on the same colour, then any further `sections`. Put
+/// it in a NavigationStack, and add toolbar items with `.toolbar { }` as on any view.
+public struct ChartScreen<Chart: View, Accessories: View, Sections: View>: View {
     let title: String
     let chart: Chart
+    let accessories: Accessories
     let sections: Sections
 
-    /// A screen titled `title`, with `chart` at the top and then `sections`: list sections, e.g. a
-    /// `Section` of related values.
-    public init(title: String, @ViewBuilder chart: () -> Chart, @ViewBuilder sections: () -> Sections) {
+    /// A screen titled `title`, with `chart` at the top, `accessories` under it, e.g. a
+    /// `ChartValueRow` or a `ChartTextButton`, and then `sections`: list sections, e.g. a `Section`
+    /// of related values.
+    ///
+    /// The accessories share one list row with the chart, so give any other buttons among them
+    /// `.buttonStyle(.borderless)`; otherwise a tap anywhere in the row triggers them all.
+    public init(
+        title: String,
+        @ViewBuilder chart: () -> Chart,
+        @ViewBuilder accessories: () -> Accessories,
+        @ViewBuilder sections: () -> Sections
+    ) {
         self.title = title
         self.chart = chart()
+        self.accessories = accessories()
         self.sections = sections()
     }
 
@@ -27,8 +38,7 @@ public struct ChartScreen<Chart: View, Sections: View>: View {
         List {
             if #available(iOS 26, *) {
                 Section {
-                    chart
-                        .topFillEdge()
+                    chartBlock
                         .listRowInsets(.top, 0) // so the chart's colour meets the nav bar
                 }
                 .listSectionMargins(.all, 0) // edge to edge, leaving other sections inset
@@ -39,8 +49,7 @@ public struct ChartScreen<Chart: View, Sections: View>: View {
                 // below keep their usual inset look.
                 Section {
                 } header: {
-                    chart
-                        .topFillEdge()
+                    chartBlock
                         .fullWidthHeader()
                 }
                 // The empty section adds its own space below the header; keep the gap to the next
@@ -55,12 +64,52 @@ public struct ChartScreen<Chart: View, Sections: View>: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
     }
+
+    private var chartBlock: some View {
+        ChartBlock(chart: chart, accessories: accessories)
+            .topFillEdge()
+    }
+}
+
+/// The chart with its accessories under it. Holds which row is selected, and hands that row's
+/// highlight to the chart. Kept inside the list row so the rows' preferences reach it: they don't
+/// cross from one list row to another.
+private struct ChartBlock<Chart: View, Accessories: View>: View {
+    let chart: Chart
+    let accessories: Accessories
+
+    @State private var selectedID: UUID?
+    @State private var highlights: [UUID: ChartHighlight] = [:]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            chart
+                .environment(\.chartHighlight, selectedID.flatMap { highlights[$0] })
+            accessories
+        }
+        .environment(\.chartHighlightSelection, ChartHighlightSelection(id: selectedID) { selectedID = $0 })
+        .onPreferenceChange(ChartHighlightsKey.self) { highlights = $0 }
+    }
+}
+
+extension ChartScreen where Accessories == EmptyView {
+    /// A screen with the chart and then `sections`.
+    public init(title: String, @ViewBuilder chart: () -> Chart, @ViewBuilder sections: () -> Sections) {
+        self.init(title: title, chart: chart, accessories: { EmptyView() }, sections: sections)
+    }
 }
 
 extension ChartScreen where Sections == EmptyView {
+    /// A screen with the chart and `accessories` under it.
+    public init(title: String, @ViewBuilder chart: () -> Chart, @ViewBuilder accessories: () -> Accessories) {
+        self.init(title: title, chart: chart, accessories: accessories, sections: { EmptyView() })
+    }
+}
+
+extension ChartScreen where Accessories == EmptyView, Sections == EmptyView {
     /// A screen with just the chart.
     public init(title: String, @ViewBuilder chart: () -> Chart) {
-        self.init(title: title, chart: chart, sections: { EmptyView() })
+        self.init(title: title, chart: chart, accessories: { EmptyView() }, sections: { EmptyView() })
     }
 }
 

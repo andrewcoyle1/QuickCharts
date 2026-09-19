@@ -55,6 +55,9 @@ final class ChartPresenter {
         /// The marks join their points (lines, areas), rather than each standing alone (bars,
         /// ranges, scatter). Tells VoiceOver's audio graph whether to play a continuous tone.
         var isContinuous = true
+        /// The marks place the series side by side in each bucket (bars, ranges), so a highlighted
+        /// reading is drawn over its own series' mark rather than the bucket's middle.
+        var placesSeriesSideBySide = false
     }
 
     let traits: Traits
@@ -62,9 +65,35 @@ final class ChartPresenter {
     /// Explicit colours so the header and callout rows can match the lines.
     var seriesColors: [Color] { configuration.seriesColors }
 
-    /// Each series' colour by name, for marks that style series individually (e.g. area gradients).
+    /// What a selected accessory row shows on the chart. While set, the series' marks turn grey so
+    /// it stands out.
+    var highlight: ChartHighlight?
+
+    /// The series' colours for their marks: `seriesColors`, or grey while something is highlighted.
+    /// The header keeps the series' colours.
+    var markColors: [Color] {
+        highlight == nil ? seriesColors : seriesColors.map { _ in Self.dimmedColor }
+    }
+
+    private static let dimmedColor = Color.gray.opacity(0.25)
+
+    /// Where each series' mark sits in a bucket, for charts that place the series side by side.
+    var seriesSlots: SeriesSlots { SeriesSlots(series: data.map(\.name), bucket: bucket) }
+
+    /// The highlight's readings, each with its series' colour, for series the chart has.
+    var highlightPoints: [HighlightPoint] {
+        guard let highlight else { return [] }
+        return data.enumerated().flatMap { index, series in
+            (highlight.points[series.name] ?? []).map {
+                HighlightPoint(series: series.name, date: $0.date, value: $0.value, color: color(at: index))
+            }
+        }
+    }
+
+    /// Each series' mark colour by name, for marks that style series individually (e.g. area
+    /// gradients).
     var colorsBySeries: [String: Color] {
-        Dictionary(uniqueKeysWithValues: data.enumerated().map { ($1.name, color(at: $0)) })
+        Dictionary(uniqueKeysWithValues: data.enumerated().map { ($1.name, markColors[$0 % markColors.count]) })
     }
 
     /// How many screens of data are loaded either side of what's visible.

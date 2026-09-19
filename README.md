@@ -174,6 +174,22 @@ ChartScreen(title: "Steps") {
 }
 ```
 
+To put rows or buttons under the chart, on the chart's colour, pass `accessories`. `ChartValueRow` shows a label and a value in a capsule, and `ChartTextButton` is a plain button in the accent colour. Give a row a `ChartHighlight` and tapping it fills the row with the highlight's colour. The chart then greys out its own marks and marks the highlight's readings, given per series, each in its series' colour and with its value, like tapping "Latest" in Health. Tapping the row again, or tapping another row, clears it:
+
+```swift
+ChartScreen(title: "Heart Rate") {
+    RangeChart(data: heartRate, configuration: ChartConfiguration(unit: "BPM", seriesColors: [.pink]))
+} accessories: {
+    ChartValueRow("Latest: 12:50 p.m.", value: "38", unit: "BPM",
+                  highlight: ChartHighlight(points: ["Heart Rate": [latest]], color: .pink))
+    ChartTextButton("Show More Heart Rate Data") { showsMore = true }
+} sections: {
+    …
+}
+```
+
+Other buttons among the accessories need `.buttonStyle(.borderless)`. They share a list row with the chart, so without it a tap anywhere in that row triggers them.
+
 To build your own layout with the same top colour, mark the view whose top edge the colour should reach with `.topFillEdge()`, and apply `.topFill(_:)` to the enclosing `List`.
 
 ## Accessibility

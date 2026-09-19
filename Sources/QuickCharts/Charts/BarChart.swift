@@ -17,7 +17,7 @@ public struct BarChart: View {
     /// appears. To change it, give the view a new `.id`.
     public init(data: [TimeSeries], configuration: ChartConfiguration = ChartConfiguration()) {
         self.data = data
-        _presenter = State(initialValue: ChartPresenter(data: data, configuration: configuration, traits: ChartPresenter.Traits(isContinuous: false)))
+        _presenter = State(initialValue: ChartPresenter(data: data, configuration: configuration, traits: ChartPresenter.Traits(isContinuous: false, placesSeriesSideBySide: true)))
     }
 
     public var body: some View {
@@ -25,7 +25,7 @@ public struct BarChart: View {
             if let selection = presenter.selection {
                 SelectionStick(date: selection.date, bucket: presenter.bucket)
             }
-            SeriesBars(points: presenter.linePoints, bucket: presenter.bucket)
+            SeriesBars(points: presenter.linePoints, bucket: presenter.bucket, slots: presenter.seriesSlots)
         }
     }
 }

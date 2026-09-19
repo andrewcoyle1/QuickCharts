@@ -37,6 +37,10 @@ final class ChartInteractionModel {
     /// live while scrolling but only a few times per screen, not every frame.
     private(set) var visibleStart: Date
 
+    /// `visibleStart` once scrolling has paused, which the y axis fits. Separate so the axis refits
+    /// once per scroll, not each time the leading edge crosses a bucket.
+    private(set) var settledStart: Date
+
     /// Which screen-length stretch of time the leading edge is in, counting back from the current
     /// period (0). Data is loaded around this, so it's the only scroll state the chart re-renders for.
     private(set) var chunk = 0
@@ -62,6 +66,7 @@ final class ChartInteractionModel {
         currentPeriod = period
         scrollPosition = period.start
         visibleStart = period.start
+        settledStart = period.start
     }
 
     /// Switches scale and, like Health, opens on the current period.
@@ -69,7 +74,13 @@ final class ChartInteractionModel {
         scale = newScale
         currentPeriod = newScale.currentPeriod()
         scrollPosition = currentPeriod.start
+        settledStart = visibleStart
         rawSelection = nil
+    }
+
+    /// Fits the y axis to what's on screen now.
+    func settle() {
+        if settledStart != visibleStart { settledStart = visibleStart }
     }
 
     /// Data for the loaded chunks around the leading edge, loaded (and cached) the first time it's

@@ -88,16 +88,33 @@ struct ChartPresenterTests {
 
     // MARK: - Y axis
 
-    @Test func yAxisStartsAtZeroWithHeadroom() {
-        #expect(presenter().yDomain == 0...(7 * 1.05))
+    /// Whether two domains match, allowing for rounding in the step arithmetic.
+    private func approximately(_ lhs: ClosedRange<Double>, _ rhs: ClosedRange<Double>) -> Bool {
+        abs(lhs.lowerBound - rhs.lowerBound) < 1e-9 && abs(lhs.upperBound - rhs.upperBound) < 1e-9
+    }
+
+    @Test func barsStartAtZeroWithHeadroom() {
+        #expect(presenter(traits: ChartPresenter.Traits(startsAtZero: true)).yDomain == 0...(7 * 1.05))
+    }
+
+    @Test func linesFitTheirValues() {
+        // 1…7, padded by 10% of the spread and rounded out to whole steps of 1. Kept above zero.
+        #expect(presenter().yDomain == 0...8)
+    }
+
+    @Test func linesFitReadingsFarFromZero() {
+        let readings = (0..<7).map { TimeSeriesDatapoint(date: day($0).addingTimeInterval(12 * 3600), value: 72 + Double($0) / 10) }
+        // 72.0…72.6, padded to 71.94…72.66 and rounded out to steps of 0.1.
+        #expect(approximately(presenter(data: [TimeSeries(name: "S", data: readings)]).yDomain, 71.9...72.7))
     }
 
     @Test func yAxisFitsTheBandOnlyWhenDrawn() {
-        #expect(presenter(traits: ChartPresenter.Traits(showsBand: true)).yDomain == 0...(8 * 1.05))
+        // 0…8 with the band, padded to 8.8 and rounded up to a step of 2.
+        #expect(presenter(traits: ChartPresenter.Traits(showsBand: true)).yDomain == 0...10)
     }
 
     @Test func yAxisStretchesToTheGoal() {
-        #expect(presenter(ChartConfiguration(goal: 20)).yDomain == 0...(20 * 1.05))
+        #expect(presenter(ChartConfiguration(goal: 20)).yDomain == 0...25)
     }
 
     @Test func yAxisFitsStackedTotals() {
@@ -106,8 +123,61 @@ struct ChartPresenterTests {
             traits: ChartPresenter.Traits(stacksSeries: true),
             data: [series("A"), series("B")]
         )
-        // The biggest day is day 6: 7 + 7 in each series, stacked to 28.
+        // The biggest day is day 6: 7 + 7 in each series, stacked to 28. Stacks always start at zero.
         #expect(presenter.yDomain == 0...(28 * 1.05))
+    }
+
+    @Test func yAxisIgnoresDataOffScreen() {
+        let lastYear = TimeSeriesDatapoint(date: calendar.date(byAdding: .year, value: -1, to: day(0))!, value: 500)
+        let withOutlier = TimeSeries(name: "S", data: series().data + [lastYear])
+        #expect(presenter(data: [withOutlier]).yDomain == 0...8)
+    }
+
+    @Test func yAxisFitsWhereALineCrossesTheEdge() {
+        let lastSunday = TimeSeriesDatapoint(date: day(0).addingTimeInterval(-12 * 3600), value: 30)
+        // The line from last Sunday's 30 to Monday's 1 crosses the week's start at 15.5: fitted 1…15.5,
+        // padded to 0…16.95, in steps of 2.5.
+        #expect(presenter(data: [TimeSeries(name: "S", data: series().data + [lastSunday])]).yDomain == 0...17.5)
+        // Bars stand alone, so last Sunday's doesn't reach into this week.
+        let bars = presenter(traits: ChartPresenter.Traits(isContinuous: false), data: [TimeSeries(name: "S", data: series().data + [lastSunday])])
+        #expect(bars.yDomain == 0...8)
+    }
+
+    @Test func yAxisFallsBackToAllTheDataForAnEmptyPeriod() {
+        let lastYear = calendar.date(byAdding: .year, value: -1, to: day(0))!
+        let old = TimeSeries(name: "S", data: [
+            TimeSeriesDatapoint(date: lastYear, value: 10),
+            TimeSeriesDatapoint(date: calendar.date(byAdding: .day, value: 2, to: lastYear)!, value: 20)
+        ])
+        // Nothing this week, so it fits 10…20 from last year: padded to 9…21, in steps of 2.
+        #expect(presenter(data: [old]).yDomain == 8...22)
+    }
+
+    @Test func yAxisRefitsOnlyOnceScrollingSettles() {
+        let lastWeek = (0..<7).map {
+            TimeSeriesDatapoint(date: day($0).addingTimeInterval(-7 * 86_400 + 12 * 3600), value: 100 + Double($0))
+        }
+        // Marks that stand alone, so the jump from last week's 106 to this week's 1 doesn't cross
+        // either week's edge (see `yAxisFitsWhereALineCrossesTheEdge`).
+        let presenter = presenter(
+            traits: ChartPresenter.Traits(isContinuous: false),
+            data: [TimeSeries(name: "S", data: series().data + lastWeek)]
+        )
+        #expect(presenter.yDomain == 0...8)
+        presenter.scrollPosition = calendar.date(byAdding: .day, value: -7, to: week.start)!
+        #expect(presenter.yDomain == 0...8) // still scrolling
+        presenter.settleYAxis()
+        // 100…106, padded to 99.4…106.6, in steps of 1.
+        #expect(presenter.yDomain == 99...107)
+    }
+
+    @Test func yAxisMakesRoomForAHighlightedReading() {
+        let presenter = presenter()
+        presenter.highlight = ChartHighlight(points: ["S": [TimeSeriesDatapoint(date: day(3), value: 12)]])
+        // 1…12, padded to 0…13.1, in steps of 2.
+        #expect(presenter.yDomain == 0...14)
+        presenter.highlight = nil
+        #expect(presenter.yDomain == 0...8)
     }
 
     // MARK: - Updates
@@ -122,7 +192,8 @@ struct ChartPresenterTests {
         presenter.update(data: [doubled])
         #expect(try #require(presenter.rangeSummary).rows.map(\.point.value) == [8])
         #expect(presenter.plottedData.first?.data.map(\.value).max() == 14)
-        #expect(presenter.yDomain == 0...(14 * 1.05))
+        // 2…14, padded to 0.8…15.2, in steps of 2.
+        #expect(presenter.yDomain == 0...16)
     }
 
     @Test func scaleChangesTheBucket() {

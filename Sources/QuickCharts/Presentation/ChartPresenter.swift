@@ -58,6 +58,9 @@ final class ChartPresenter {
         /// The marks place the series side by side in each bucket (bars, ranges), so a highlighted
         /// reading is drawn over its own series' mark rather than the bucket's middle.
         var placesSeriesSideBySide = false
+        /// The marks measure from zero (bars, areas), so the y axis keeps zero and fits only its top.
+        /// Otherwise it fits the values at both ends.
+        var startsAtZero = false
     }
 
     let traits: Traits
@@ -141,8 +144,8 @@ final class ChartPresenter {
     /// How many screens of data are loaded either side of what's visible.
     private static let marginScreens = 2
 
-    /// The y axis for each scale, worked out the first time it's shown.
-    @ObservationIgnored private var yDomains: [TimeScale: ClosedRange<Double>] = [:]
+    /// The y axis for each scale and settled period, worked out the first time it's shown.
+    @ObservationIgnored private var yDomains: [String: ClosedRange<Double>] = [:]
 
     init(data: [TimeSeries], configuration: ChartConfiguration = ChartConfiguration(), traits: Traits = Traits()) {
         let scales = Self.scales(in: configuration)
@@ -183,22 +186,75 @@ final class ChartPresenter {
     /// The bucket each plotted point represents: a day for W and M, a week for 6M, a month for Y.
     var bucket: Calendar.Component { scale.bucket }
 
-    /// Fixed per scale, from all the data bucketed for that scale (and the goal), so the y axis
-    /// doesn't jump as data loads in while scrolling. Per scale because bucket values can differ
-    /// hugely between scales, e.g. a month's total steps against a day's.
+    /// Fitted to the buckets in the period on screen once scrolling settles, like Health, so the data
+    /// in view fills the plot without the axis rescaling on every frame of a scroll. A period with no
+    /// data falls back to all the data at this scale. Always includes the goal, and any highlighted
+    /// readings: they're single readings, so on 6M or Y they can lie outside their bucket's average.
     var yDomain: ClosedRange<Double> {
+        let highlighted = highlightedValues
         let scale = scale
-        if let domain = yDomains[scale] { return domain }
-        let bucketed = data.map { $0.bucketed(by: scale.bucket, aggregation: aggregation) }
-        let dataValues = traits.stacksSeries
-            // Stacked: each bucket's total across the series. Buckets share midpoint dates.
-            ? Dictionary(grouping: bucketed.flatMap(\.data), by: \.date).values.map { $0.reduce(0) { $0 + $1.value } }
-            : bucketed.flatMap { $0.data.map(\.value) + (traits.showsBand ? $0.band.flatMap { [$0.lower, $0.upper] } : []) }
-        let values = dataValues + [configuration.goal].compactMap { $0 }
-        // 5% headroom so points at the maximum aren't half cut off at the top of the plot.
-        let domain = min(0, values.min() ?? 0)...((values.max() ?? 1) * 1.05)
-        yDomains[scale] = domain
+        let start = interaction.settledStart
+        let key = "\(scale.rawValue)|\(start.timeIntervalSinceReferenceDate)"
+        if highlighted.isEmpty, let domain = yDomains[key] { return domain }
+        let visible = yValues(in: start..<start.addingTimeInterval(visibleLength))
+        let values = (visible.isEmpty ? yValues(in: nil) : visible) + [configuration.goal].compactMap { $0 }
+        let domain = YAxisFit.domain(for: values + highlighted, startsAtZero: traits.startsAtZero || traits.stacksSeries)
+        // Not cached with a highlight, which comes and goes.
+        if highlighted.isEmpty { yDomains[key] = domain }
         return domain
+    }
+
+    /// The highlight's readings for series the chart has. Read from the highlight itself, not
+    /// `highlightPoints`, which places its labels using `yDomain`.
+    private var highlightedValues: [Double] {
+        guard let highlight else { return [] }
+        return data.flatMap { (highlight.points[$0.name] ?? []).map(\.value) }
+    }
+
+    /// What the marks plot in `range` (or everywhere, if nil), bucketed for the current scale: each
+    /// bucket's value, its band if drawn, or for stacked series each bucket's total. Joined marks
+    /// also count where they cross the range's edges, on their way to readings outside it; otherwise
+    /// that stretch of line would run out of the plot.
+    private func yValues(in range: Range<Date>?) -> [Double] {
+        let bucketed = data.map { $0.bucketed(by: bucket, aggregation: aggregation) }
+        if traits.stacksSeries {
+            // Buckets share midpoint dates across the series.
+            let points = bucketed.flatMap(\.data).filter { range?.contains($0.date) ?? true }
+            return Dictionary(grouping: points, by: \.date).values.map { $0.reduce(0) { $0 + $1.value } }
+        }
+        return bucketed.flatMap { series in
+            let points = series.sortedByDate.map { ($0.date, $0.value) }
+            let bands = traits.showsBand ? series.band : []
+            let lowers = bands.map { ($0.date, $0.lower) }
+            let uppers = bands.map { ($0.date, $0.upper) }
+            guard let range else { return points.map(\.1) + lowers.map(\.1) + uppers.map(\.1) }
+            var values = [points, lowers, uppers].flatMap { $0.filter { range.contains($0.0) }.map(\.1) }
+            if traits.isContinuous {
+                values += [points, lowers, uppers].flatMap { line in
+                    [range.lowerBound, range.upperBound].compactMap { Self.interpolate(line, at: $0) }
+                }
+            }
+            return values
+        }
+    }
+
+    /// Where the straight line through `points` (oldest first) crosses `date`, or nil if there are
+    /// no points either side of it.
+    private static func interpolate(_ points: [(Date, Double)], at date: Date) -> Double? {
+        guard let after = points.firstIndex(where: { $0.0 >= date }), after > 0 else { return nil }
+        let (startDate, startValue) = points[after - 1]
+        let (endDate, endValue) = points[after]
+        let fraction = date.timeIntervalSince(startDate) / endDate.timeIntervalSince(startDate)
+        return startValue + (endValue - startValue) * fraction
+    }
+
+    /// The leading edge's bucket boundary, which changes a few times per screen while scrolling.
+    /// The chart waits for it to stop changing before calling `settleYAxis()`.
+    var visibleStart: Date { interaction.visibleStart }
+
+    /// Refits the y axis to the period now on screen.
+    func settleYAxis() {
+        interaction.settle()
     }
 
     /// How much time is on screen: the length of the current period.

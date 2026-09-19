@@ -49,6 +49,12 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
             // A scale change moves the scroll position without going through the chart's binding.
             writeViewport()
         }
+        // Refit the y axis once the leading edge stops moving, rather than at each bucket it
+        // crosses mid-scroll. A new boundary cancels the wait and starts it again.
+        .task(id: presenter.visibleStart) {
+            try? await Task.sleep(for: .milliseconds(300))
+            if !Task.isCancelled { presenter.settleYAxis() }
+        }
     }
 
     /// Takes on the shared range and scroll position, or, as the first chart to appear, sets them.
@@ -94,6 +100,7 @@ struct TimeSeriesChart<Marks: ChartContent>: View {
         .chartLegend(.hidden) // the header and callout name the series
         .chartXScale(domain: presenter.fullDomain)
         .chartYScale(domain: presenter.yDomain)
+        .animation(.smooth, value: presenter.yDomain)
         .chartScrollableAxes(.horizontal)
         .chartXVisibleDomain(length: presenter.visibleLength)
         .chartScrollPosition(x: Binding {

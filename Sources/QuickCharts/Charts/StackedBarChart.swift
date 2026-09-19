@@ -18,7 +18,7 @@ public struct StackedBarChart: View {
     /// appears. To change it, give the view a new `.id`.
     public init(data: [TimeSeries], configuration: ChartConfiguration = ChartConfiguration(aggregation: .sum)) {
         self.data = data
-        _presenter = State(initialValue: ChartPresenter(data: data, configuration: configuration, traits: ChartPresenter.Traits(stacksSeries: true, isContinuous: false)))
+        _presenter = State(initialValue: ChartPresenter(data: data, configuration: configuration, traits: ChartPresenter.Traits(stacksSeries: true, isContinuous: false, startsAtZero: true)))
     }
 
     public var body: some View {

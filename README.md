@@ -24,6 +24,7 @@ Every part can be configured.
 - **Seven chart types:** line (with an optional band), bar, stacked bar, area, range, scatter and step.
 - **Five ranges:** a day with hourly buckets, a week, a month, six months with weekly buckets, and a year with monthly buckets. You choose which ones each chart offers.
 - **Aggregation:** readings are averaged, totalled, spanned (lowest to highest) or left raw. The header can show the range's figure or the daily average, like Health's steps.
+- **A y axis that fits what's on screen:** once scrolling settles, the axis refits to the period in view, like Health. Lines, points, steps and ranges fit their values at both ends; bars and areas keep zero and fit their top.
 - **Built for large histories:** only a few screens of data around the visible range are bucketed and plotted, and scrolling doesn't redraw the chart on every frame.
 - **Health-style screen:** `ChartScreen` puts the chart in an edge-to-edge top section whose colour carries on up behind the navigation bar, even when you pull down.
 - **Rows that highlight:** value rows under the chart mark their readings on it when tapped, and a "Show More" sheet keeps the chart pinned above more rows, like Health's detail screens.

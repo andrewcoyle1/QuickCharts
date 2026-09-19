@@ -23,11 +23,9 @@ struct HighlightTests {
         calendar.date(byAdding: .day, value: index, to: week.start)!.addingTimeInterval(12 * 3600)
     }
 
-    /// Readings of 0 and 10 each day this week, so the y axis runs to 10.5.
+    /// A reading of 10 each day this week, so the y axis runs from 0 to 10.5.
     private func series(_ name: String) -> TimeSeries {
-        TimeSeries(name: name, data: (0..<7).flatMap { index in
-            [TimeSeriesDatapoint(date: noon(index), value: 0), TimeSeriesDatapoint(date: noon(index).addingTimeInterval(60), value: 10)]
-        })
+        TimeSeries(name: name, data: (0..<7).map { TimeSeriesDatapoint(date: noon($0), value: 10) })
     }
 
     private func presenter(highlight: [String: [TimeSeriesDatapoint]]) -> ChartPresenter {

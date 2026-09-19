@@ -39,12 +39,12 @@ Every part can be configured.
 
 Add the package with Swift Package Manager.
 
-- **In Xcode:** choose **File › Add Package Dependencies…**. Then either click **Add Local…** and pick the `QuickCharts` folder, or enter the repository's URL.
+- **In Xcode:** choose **File › Add Package Dependencies…** and enter `https://github.com/andrewcoyle1/QuickCharts`.
 - **In a `Package.swift`:**
 
   ```swift
   dependencies: [
-      .package(path: "../QuickCharts"), // or .package(url: …, from: …) once published
+      .package(url: "https://github.com/andrewcoyle1/QuickCharts", from: "0.1.0"),
   ],
   targets: [
       .target(name: "MyApp", dependencies: ["QuickCharts"]),
@@ -209,4 +209,8 @@ To build your own layout with the same top colour, mark the view whose top edge 
   xcodebuild test -scheme QuickCharts -destination 'platform=iOS Simulator,name=iPhone 16'
   ```
 
-- **Demo app:** the `ChartSandbox` app next to this package lists a demo of every chart type and feature, and is the quickest way to try changes.
+- **Previews:** each chart type's file has a SwiftUI preview built from the sample data, which is the quickest way to try changes.
+
+## License
+
+QuickCharts is available under the MIT license. See [LICENSE](LICENSE).

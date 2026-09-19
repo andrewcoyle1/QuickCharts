@@ -177,10 +177,13 @@ struct SeriesBars: ChartContent {
 extension SeriesBars {
     private func bar(for point: PlotPoint, in slots: SeriesSlots) -> some ChartContent {
         let span = slots.span(of: point.series, at: point.date)
-        return BarMark(
+        // A rectangle from zero, not `BarMark(xStart:xEnd:y:)`: that draws a thin horizontal bar at
+        // `y`, which left each bar floating at its value like a range capsule.
+        return RectangleMark(
             xStart: .value("Start", span.lowerBound),
             xEnd: .value("End", span.upperBound),
-            y: .value("Value", point.value)
+            yStart: .value("Base", 0),
+            yEnd: .value("Value", point.value)
         )
         .foregroundStyle(by: .value("Series", point.series))
     }

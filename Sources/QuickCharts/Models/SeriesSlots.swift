@@ -34,8 +34,11 @@ nonisolated struct SeriesSlots {
 
     private func slot(of name: String, at date: Date) -> (center: Date, length: TimeInterval) {
         guard let interval = Calendar.current.dateInterval(of: bucket, for: date) else { return (date, 0) }
+        let middle = interval.start.addingTimeInterval(interval.duration / 2)
+        // A series with no slot of its own, e.g. a combo chart's line, sits in the middle of the
+        // bucket rather than borrowing the first series' slot.
+        guard let index = series.firstIndex(of: name) else { return (middle, 0) }
         let count = max(1, series.count)
-        let index = series.firstIndex(of: name) ?? 0
         let groupLength = interval.duration * Self.groupRatio
         let slotLength = groupLength / Double(count)
         let groupStart = interval.start.addingTimeInterval((interval.duration - groupLength) / 2)

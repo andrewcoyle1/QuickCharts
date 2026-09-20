@@ -219,10 +219,13 @@ struct SelectionStick: ChartContent {
 struct SelectionLollipop: ChartContent {
     let selection: ChartPresenter.Selection
     let bucket: Calendar.Component
+    /// The series that get a head, or all of them when nil. A combo chart passes its lines: a bar is
+    /// already marked by the stick crossing it, and a head at the top of one reads as a data point.
+    var series: Set<String>?
 
     var body: some ChartContent {
         SelectionStick(date: selection.date, bucket: bucket)
-        ForEach(selection.rows) { row in
+        ForEach(headRows) { row in
             PointMark(
                 x: .value("Day", row.point.date, unit: bucket),
                 y: .value("Value", row.point.value)
@@ -230,6 +233,11 @@ struct SelectionLollipop: ChartContent {
             .foregroundStyle(by: .value("Series", row.series.name))
             .symbolSize(120)
         }
+    }
+
+    private var headRows: [SelectionRow] {
+        guard let series else { return selection.rows }
+        return selection.rows.filter { series.contains($0.series.name) }
     }
 }
 

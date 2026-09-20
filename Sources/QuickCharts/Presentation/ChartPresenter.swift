@@ -45,7 +45,7 @@ final class ChartPresenter {
 
     /// What a chart variant's marks need from the presenter. Set by the variant, not the
     /// configuration, since it follows from how the variant draws.
-    struct Traits {
+    nonisolated struct Traits {
         /// The series are stacked on each other (e.g. stacked bars), so the y axis must fit their
         /// total rather than the largest one.
         var stacksSeries = false
@@ -61,6 +61,10 @@ final class ChartPresenter {
         /// The marks measure from zero (bars, areas), so the y axis keeps zero and fits only its top.
         /// Otherwise it fits the values at both ends.
         var startsAtZero = false
+        /// The series drawn as a line over the variant's usual marks (`ComboChart`). They join their
+        /// points whatever `isContinuous` says, and they take no side-by-side slot, since a line runs
+        /// across the whole bucket rather than standing in part of it.
+        var lineSeries: Set<String> = []
     }
 
     let traits: Traits
@@ -80,8 +84,11 @@ final class ChartPresenter {
 
     private static let dimmedColor = Color.gray.opacity(0.25)
 
-    /// Where each series' mark sits in a bucket, for charts that place the series side by side.
-    var seriesSlots: SeriesSlots { SeriesSlots(series: data.map(\.name), bucket: bucket) }
+    /// Where each series' mark sits in a bucket, for charts that place the series side by side. The
+    /// line series are left out: they have no slot, so the bars fill the bucket between them.
+    var seriesSlots: SeriesSlots {
+        SeriesSlots(series: data.map(\.name).filter { !traits.lineSeries.contains($0) }, bucket: bucket)
+    }
 
     /// The highlight's readings, each with its series' colour, for series the chart has. In each
     /// bucket the highest keeps its label above, unless it's near the top of the chart, where the
@@ -229,7 +236,7 @@ final class ChartPresenter {
             let uppers = bands.map { ($0.date, $0.upper) }
             guard let range else { return points.map(\.1) + lowers.map(\.1) + uppers.map(\.1) }
             var values = [points, lowers, uppers].flatMap { $0.filter { range.contains($0.0) }.map(\.1) }
-            if traits.isContinuous {
+            if traits.isContinuous || traits.lineSeries.contains(series.name) {
                 values += [points, lowers, uppers].flatMap { line in
                     [range.lowerBound, range.upperBound].compactMap { Self.interpolate(line, at: $0) }
                 }

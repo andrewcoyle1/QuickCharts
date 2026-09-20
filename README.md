@@ -21,7 +21,7 @@ Every part can be configured.
 
 ## Features
 
-- **Seven chart types:** line (with an optional band), bar, stacked bar, area, range, scatter and step.
+- **Eight chart types:** line (with an optional band), bar, stacked bar, combo (bars with a line over them), area, range, scatter and step.
 - **Five ranges:** a day with hourly buckets, a week, a month, six months with weekly buckets, and a year with monthly buckets. You choose which ones each chart offers.
 - **Aggregation:** readings are averaged, totalled, spanned (lowest to highest) or left raw. The header can show the range's figure or the daily average, like Health's steps.
 - **A y axis that fits what's on screen:** once scrolling settles, the axis refits to the period in view, like Health. Lines, points, steps and ranges fit their values at both ends; bars and areas keep zero and fit their top.
@@ -118,12 +118,23 @@ var body: some View {
 | `LineChart` | A smoothed line per series, with its band shaded behind it | Averages with an error margin |
 | `BarChart` | A bar per bucket, series side by side | Exercise minutes, daily totals |
 | `StackedBarChart` | One bar per bucket, series stacked. Defaults to `.sum` | Active + resting energy |
+| `ComboChart` | Bars with the series you name drawn as lines over them | Calories eaten against calories burned |
 | `AreaChart` | A filled area per series, fading towards the bottom | Distance, cumulative values |
 | `RangeChart` | A capsule from each bucket's lowest to highest reading. Always uses `.range` | Heart rate |
 | `ScatterChart` | Every raw reading, centred in its day. Always uses `.none` | Weight, blood pressure |
 | `StepChart` | A line that holds its value across each bucket | Targets, settings |
 
-All of them share the same picker, header, scrolling, snapping, selection callout and axes, and all take `init(data:configuration:)`.
+All of them share the same picker, header, scrolling, snapping, selection callout and axes, and all take `init(data:configuration:)` — except `ComboChart`, which also takes the names of the series to draw as lines:
+
+```swift
+ComboChart(
+    data: [intake, expenditure],
+    lineSeries: ["Expenditure"],
+    configuration: ChartConfiguration(unit: "kcal")
+)
+```
+
+Its line is a series like any other, so it appears in the header, the callout and the accessory rows, and a row can highlight it. Use `ChartConfiguration.goal` instead when the level to compare against is a single fixed number rather than one that moves with the data.
 
 ## Configuration
 

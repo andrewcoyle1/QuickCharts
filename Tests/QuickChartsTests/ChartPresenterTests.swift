@@ -180,6 +180,40 @@ struct ChartPresenterTests {
         #expect(presenter.yDomain == 0...8)
     }
 
+    // MARK: - Combo charts
+
+    /// The traits `ComboChart` sets: bars, with `line` drawn over them.
+    private var comboTraits: ChartPresenter.Traits {
+        ChartPresenter.Traits(isContinuous: false, placesSeriesSideBySide: true, startsAtZero: true, lineSeries: ["Line"])
+    }
+
+    @Test func comboSlotsLeaveOutTheLine() {
+        let presenter = presenter(traits: comboTraits, data: [series("Bars"), series("Line")])
+        let slots = presenter.seriesSlots
+        // One slot, so the bars stay centred in the bucket rather than shuffling left for the line.
+        #expect(slots.series == ["Bars"])
+        #expect(slots.center(of: "Bars", at: day(1)) == slots.center(of: "Line", at: day(1)))
+    }
+
+    @Test func comboAxisKeepsZeroAndFitsTheLineAboveTheBars() {
+        let high = TimeSeries(name: "Line", data: (0..<7).map {
+            TimeSeriesDatapoint(date: day($0).addingTimeInterval(12 * 3600), value: 20)
+        })
+        // The bars reach 7 and the line sits at 20: the axis has to hold both, from zero.
+        #expect(presenter(traits: comboTraits, data: [series("Bars"), high]).yDomain == 0...(20 * 1.05))
+    }
+
+    @Test func comboLineReachesAcrossTheEdgeButTheBarsDoNot() {
+        let lastSunday = TimeSeriesDatapoint(date: day(0).addingTimeInterval(-12 * 3600), value: 30)
+        let line = TimeSeries(name: "Line", data: series().data + [lastSunday])
+        // The line from last Sunday's 30 down to Monday's 1 crosses the week's start at 15.5, so the
+        // axis makes room for it, exactly as it would on a line chart.
+        #expect(presenter(traits: comboTraits, data: [line]).yDomain == 0...(15.5 * 1.05))
+        // The same readings as bars stop at the week's edge.
+        let bars = TimeSeries(name: "Bars", data: series().data + [lastSunday])
+        #expect(presenter(traits: comboTraits, data: [bars]).yDomain == 0...(7 * 1.05))
+    }
+
     // MARK: - Updates
 
     @Test func updatedDataReplacesTheOld() throws {

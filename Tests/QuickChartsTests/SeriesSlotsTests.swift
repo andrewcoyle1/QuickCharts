@@ -55,6 +55,14 @@ struct SeriesSlotsTests {
         }
     }
 
+    /// A combo chart's line has no slot of its own: it runs across the bucket, so a highlighted
+    /// reading on it belongs in the middle rather than over the first bar.
+    @Test func aSeriesWithNoSlotSitsInTheMiddle() {
+        let slots = SeriesSlots(series: ["A", "B"], bucket: .day)
+        #expect(hours(slots.center(of: "Line", at: noon)) == 12)
+        #expect(slots.center(of: "Line", at: noon) != slots.center(of: "A", at: noon))
+    }
+
     @Test func slotsDoNotOverlap() {
         let slots = SeriesSlots(series: ["A", "B", "C"], bucket: .day)
         let spans = ["A", "B", "C"].map { slots.span(of: $0, at: noon) }

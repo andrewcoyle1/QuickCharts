@@ -117,6 +117,38 @@ public nonisolated struct ContributionGrid: Equatable, Sendable {
         self.calendar = calendar
     }
 
+    /// Builds the grid from a value per day, oldest first, ending on `endDate`.
+    ///
+    /// For callers that hold a day-by-day array and have no dates to hand — a card showing the
+    /// last thirty days, say. Values beyond the grid's shape are ignored, and a short array leaves
+    /// its earliest days empty.
+    public init(
+        values: [Double],
+        layout: ContributionLayout = .calendar(),
+        goal: Double = 1,
+        levels: Int = 5,
+        endDate: Date = Date(),
+        calendar: Calendar = .current
+    ) {
+        let lastDay = calendar.startOfDay(for: endDate)
+        let points = values.enumerated().map { offset, value in
+            TimeSeriesDatapoint(
+                id: "contribution-\(offset)",
+                date: calendar.date(byAdding: .day, value: offset - (values.count - 1), to: lastDay) ?? lastDay,
+                value: value
+            )
+        }
+        self.init(
+            series: TimeSeries(name: "", data: points),
+            layout: layout,
+            goal: goal,
+            levels: levels,
+            aggregation: .sum,
+            endDate: endDate,
+            calendar: calendar
+        )
+    }
+
     /// The first day a grid of this shape covers, given the day it ends on. A `.calendar` grid
     /// backs up to the start of the week holding `endDate` and then counts whole weeks, so its
     /// rows stay on one weekday; a `.packed` grid simply counts back `rows * columns` days.

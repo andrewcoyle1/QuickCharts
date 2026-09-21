@@ -21,7 +21,7 @@ Every part can be configured.
 
 ## Features
 
-- **Eight chart types:** line (with an optional band), bar, stacked bar, combo (bars with a line over them), area, range, scatter and step.
+- **Nine chart types:** line (with an optional band), bar, stacked bar, combo (bars with a line over them), area, range, scatter, step, and a contribution grid of a square per day.
 - **Five ranges:** a day with hourly buckets, a week, a month, six months with weekly buckets, and a year with monthly buckets. You choose which ones each chart offers.
 - **Aggregation:** readings are averaged, totalled, spanned (lowest to highest) or left raw. The header can show the range's figure or the daily average, like Health's steps.
 - **A y axis that fits what's on screen:** once scrolling settles, the axis refits to the period in view, like Health. Lines, points, steps and ranges fit their values at both ends; bars and areas keep zero and fit their top.
@@ -123,8 +123,9 @@ var body: some View {
 | `RangeChart` | A capsule from each bucket's lowest to highest reading. Always uses `.range` | Heart rate |
 | `ScatterChart` | Every raw reading, centred in its day. Always uses `.none` | Weight, blood pressure |
 | `StepChart` | A line that holds its value across each bucket | Targets, settings |
+| `ContributionChart` | A square per day, shaded by how far it got towards the goal | Days logged, streaks |
 
-All of them share the same picker, header, scrolling, snapping, selection callout and axes, and all take `init(data:configuration:)` — except `ComboChart`, which also takes the names of the series to draw as lines:
+The first eight share the same picker, header, scrolling, snapping, selection callout and axes, and all take `init(data:configuration:)` — except `ComboChart`, which also takes the names of the series to draw as lines:
 
 ```swift
 ComboChart(
@@ -135,6 +136,17 @@ ComboChart(
 ```
 
 Its line is a series like any other, so it appears in the header, the callout and the accessory rows, and a row can highlight it. Use `ChartConfiguration.goal` instead when the level to compare against is a single fixed number rather than one that moves with the data.
+
+`ContributionChart` is the one that reads differently. It asks whether a day happened at all, so it draws a week per column and seven weekdays down the rows, each square shaded by how far that day got towards `goal`:
+
+```swift
+ContributionChart(
+    data: [workouts],
+    configuration: ChartConfiguration(aggregation: .sum, unit: "workouts", goal: 1)
+)
+```
+
+It scrolls, snaps and inspects like the rest — the header counts the logged days on screen and updates as you scroll, and press-and-hold puts a callout on the day under your finger — but there is no range picker, because a day is a day at whatever zoom. Squares are a fixed size, so how much history fits follows from the width. Only the first series is plotted; the array is there to match the other charts' shape. For a small static grid inside a card, where the whole thing is one tap target, use `ContributionGridView`, which draws the same squares with no scrolling or selection. It takes a `ContributionGrid`, which you build from a dated `TimeSeries` or, when you hold a day-by-day array and have no dates to hand, from `values:`.
 
 ## Configuration
 

@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Each series as a bar per bucket, side by side, with a stick on the selected bucket.
 public struct BarChart: View {

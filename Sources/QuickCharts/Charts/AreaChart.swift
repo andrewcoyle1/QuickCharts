@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Each series as a filled area under a smoothed line, with a lollipop on the selected bucket.
 public struct AreaChart: View {

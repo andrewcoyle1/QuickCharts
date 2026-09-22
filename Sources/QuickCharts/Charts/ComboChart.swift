@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Bars with a line drawn over them, for comparing a total against a level: calories eaten against
 /// calories burned, spend against budget, rainfall against average. The series named in `lineSeries`

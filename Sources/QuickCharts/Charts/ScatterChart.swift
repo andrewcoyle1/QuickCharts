@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Every raw reading as a point, not bucketed, e.g. weight or blood pressure. The callout averages
 /// the readings in the selected bucket.

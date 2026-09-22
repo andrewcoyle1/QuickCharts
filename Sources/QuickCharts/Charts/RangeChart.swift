@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Each series' lowest to highest reading per bucket as a floating capsule, e.g. heart rate.
 public struct RangeChart: View {

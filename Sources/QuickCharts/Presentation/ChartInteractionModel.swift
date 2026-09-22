@@ -7,6 +7,7 @@
 
 import Foundation
 import Charts
+import SwiftUI
 
 /// Scroll, loading and selection state for the chart. It's `@Observable` so each view only
 /// re-renders for the properties it reads. `scrollPosition` changes every frame while scrolling, so

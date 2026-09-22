@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Each series as a smoothed line over its shaded band, with a lollipop on the selected bucket.
 public struct LineChart: View {

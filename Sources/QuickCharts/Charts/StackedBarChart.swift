@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Each bucket's total as one bar, split into the series stacked on each other, e.g. active and
 /// resting energy.

@@ -6,6 +6,7 @@
 //
 
 import Charts
+import SwiftUI
 
 /// Each series as a line that holds its value across each bucket, with a lollipop on the selected
 /// bucket.

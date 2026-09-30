@@ -148,6 +148,19 @@ ContributionChart(
 
 It scrolls, snaps and inspects like the rest — the header counts the logged days on screen and updates as you scroll, and press-and-hold puts a callout on the day under your finger — but there is no range picker, because a day is a day at whatever zoom. Squares are a fixed size, so how much history fits follows from the width. Only the first series is plotted; the array is there to match the other charts' shape. For a small static grid inside a card, where the whole thing is one tap target, use `ContributionGridView`, which draws the same squares with no scrolling or selection. It takes a `ContributionGrid`, which you build from a dated `TimeSeries` or, when you hold a day-by-day array and have no dates to hand, from `values:`.
 
+### Thumbnails
+
+For a summary card whose whole surface is one button that opens the full chart, use `ChartThumbnail`: the same data drawn with nothing to operate — no picker, header, axes, scrolling or selection — and it takes no touches, so it never fights the card for the press.
+
+```swift
+ChartThumbnail(data: [weight], style: .line, colors: [.purple])            // line over a fading area
+ChartThumbnail(data: [protein, carbs, fat], style: .bars, colors: [...])   // bars, stacked
+ChartThumbnail(data: [intake, burned], style: .combo(lineSeries: ["Burned"]), colors: [...])
+ProgressThumbnail(value: 112, target: 150, maxValue: 180, color: .red)     // one value against a target
+```
+
+Each reading is one mark per day, drawn as given, so pass the window the card describes. A zero bar draws as a short grey stub, so a week with rest days still shows seven slots. A line fits its own values rather than zero. It is 36 pt tall unless you pass `height:`.
+
 ## Configuration
 
 Every setting of `ChartConfiguration` has a default, so pass only the ones you need.
